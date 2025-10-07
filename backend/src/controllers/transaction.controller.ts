@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Transaction } from '../models/Transaction';
 import { Category, TransactionType } from '../models/Category';
-import { extractReceiptData } from '../services/ocr.service';
+import { extractReceiptData } from '../services/gemini-ocr.service';
 
 interface AuthRequest extends Request {
   userId?: string;
@@ -344,8 +344,8 @@ export const uploadTransactionHistory = async (req: AuthRequest, res: Response):
     const filePath = req.file.path;
     const mimeType = req.file.mimetype;
 
-    // Extract transaction history from PDF
-    const { extractTransactionHistory } = await import('../services/ocr.service');
+    // Extract transaction history using Google Gemini AI
+    const { extractTransactionHistory } = await import('../services/gemini-ocr.service');
     const extractedHistory = await extractTransactionHistory(filePath, mimeType);
 
     res.json({
