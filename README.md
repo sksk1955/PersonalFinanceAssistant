@@ -1,5 +1,8 @@
 "# Personal Finance Assistant
 
+## 🎥 Demo Video
+[![Watch Demo Video](https://img.shields.io/badge/🎥-Watch%20Demo%20Video-red?style=for-the-badge)](https://drive.google.com/file/d/1ZC64yuAd6iJC_ttg9bLEiIR_lmCF5MvO/view?usp=sharing)
+
 A full-stack web application designed to help users track, manage, and understand their financial activities. Users can log income and expenses, categorize transactions, view analytics with interactive charts, and extract transaction data from receipts using OCR technology.
 
 ![License](https://img.shields.io/badge/license-ISC-blue.svg)
