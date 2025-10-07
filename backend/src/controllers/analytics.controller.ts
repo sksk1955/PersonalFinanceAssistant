@@ -155,6 +155,286 @@ export const getTransactionsByDate = async (req: AuthRequest, res: Response): Pr
   }
 };
 
+export const getWeeklyTrends = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { weeks = 12 } = req.query;
+    const weeksBack = parseInt(weeks as string);
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - (weeksBack * 7));
+
+    const weeklyData = await Transaction.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(req.userId),
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            week: { $week: '$date' },
+            year: { $year: '$date' },
+            type: '$type'
+          },
+          amount: { $sum: '$amount' }
+        }
+      },
+      {
+        $group: {
+          _id: { week: '$_id.week', year: '$_id.year' },
+          income: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.type', TransactionType.INCOME] }, '$amount', 0]
+            }
+          },
+          expenses: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.type', TransactionType.EXPENSE] }, '$amount', 0]
+            }
+          }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.week': 1 } },
+      { $limit: weeksBack }
+    ]);
+
+    const result = weeklyData.map((item, index) => ({
+      week: `Week ${item._id.week}`,
+      weekNum: index + 1,
+      income: item.income || 0,
+      expenses: item.expenses || 0,
+      net: (item.income || 0) - (item.expenses || 0)
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error('Get weekly trends error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const getDailyPatterns = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { days = 30 } = req.query;
+    const daysBack = parseInt(days as string);
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+
+    const dailyData = await Transaction.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(req.userId),
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            dayOfWeek: { $dayOfWeek: '$date' },
+            type: '$type'
+          },
+          amount: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.dayOfWeek',
+          income: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.type', TransactionType.INCOME] }, '$amount', 0]
+            }
+          },
+          expenses: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.type', TransactionType.EXPENSE] }, '$amount', 0]
+            }
+          },
+          transactions: { $sum: '$count' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const result = dayNames.map((day, index) => {
+      const dayData = dailyData.find(item => item._id === index + 1);
+      return {
+        day,
+        income: dayData?.income || 0,
+        expenses: dayData?.expenses || 0,
+        transactions: dayData?.transactions || 0,
+        net: (dayData?.income || 0) - (dayData?.expenses || 0)
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Get daily patterns error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const getSpendingHeatmap = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { months = 12 } = req.query;
+    const monthsBack = parseInt(months as string);
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - monthsBack);
+
+    const heatmapData = await Transaction.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(req.userId),
+          type: TransactionType.EXPENSE,
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            day: { $dayOfMonth: '$date' },
+            month: { $month: '$date' },
+            year: { $year: '$date' }
+          },
+          amount: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          date: {
+            $dateFromParts: {
+              year: '$_id.year',
+              month: '$_id.month',
+              day: '$_id.day'
+            }
+          },
+          amount: 1,
+          count: 1
+        }
+      },
+      { $sort: { date: 1 } }
+    ]);
+
+    res.json(heatmapData);
+  } catch (error) {
+    console.error('Get spending heatmap error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const getTransactionVolume = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { period = 'week', periods = 12 } = req.query;
+    const periodsCount = parseInt(periods as string);
+    
+    let groupBy: any;
+    let sortKey: string;
+    let periodName: string;
+    
+    if (period === 'week') {
+      groupBy = {
+        week: { $week: '$date' },
+        year: { $year: '$date' }
+      };
+      sortKey = 'week';
+      periodName = 'Week';
+    } else if (period === 'month') {
+      groupBy = {
+        month: { $month: '$date' },
+        year: { $year: '$date' }
+      };
+      sortKey = 'month';
+      periodName = 'Month';
+    } else {
+      // Daily
+      groupBy = {
+        day: { $dayOfMonth: '$date' },
+        month: { $month: '$date' },
+        year: { $year: '$date' }
+      };
+      sortKey = 'day';
+      periodName = 'Day';
+    }
+
+    const endDate = new Date();
+    const startDate = new Date();
+    
+    if (period === 'week') {
+      startDate.setDate(startDate.getDate() - (periodsCount * 7));
+    } else if (period === 'month') {
+      startDate.setMonth(startDate.getMonth() - periodsCount);
+    } else {
+      startDate.setDate(startDate.getDate() - periodsCount);
+    }
+
+    const volumeData = await Transaction.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(req.userId),
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: groupBy,
+          transactionCount: { $sum: 1 },
+          totalVolume: { $sum: '$amount' },
+          incomeVolume: {
+            $sum: {
+              $cond: [{ $eq: ['$type', TransactionType.INCOME] }, '$amount', 0]
+            }
+          },
+          expenseVolume: {
+            $sum: {
+              $cond: [{ $eq: ['$type', TransactionType.EXPENSE] }, '$amount', 0]
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          avgAmount: { $divide: ['$totalVolume', '$transactionCount'] }
+        }
+      },
+      { $sort: { [`_id.year`]: 1, [`_id.${sortKey}`]: 1 } },
+      { $limit: periodsCount }
+    ]);
+
+    const result = volumeData.map((item, index) => {
+      let periodLabel: string;
+      
+      if (period === 'week') {
+        periodLabel = `${periodName} ${item._id.week}`;
+      } else if (period === 'month') {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        periodLabel = `${monthNames[item._id.month - 1]} ${item._id.year}`;
+      } else {
+        periodLabel = `${item._id.day}/${item._id.month}`;
+      }
+      
+      return {
+        period: periodLabel,
+        transactionCount: item.transactionCount || 0,
+        totalVolume: Math.round(item.totalVolume || 0),
+        avgAmount: Math.round(item.avgAmount || 0),
+        incomeVolume: Math.round(item.incomeVolume || 0),
+        expenseVolume: Math.round(item.expenseVolume || 0)
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Get transaction volume error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 export const getMonthlyTrends = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { year, startDate, endDate } = req.query;

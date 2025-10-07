@@ -66,37 +66,7 @@ function Login() {
             <p className="text-lg text-gray-600 leading-relaxed">
               Track expenses, analyze spending patterns, and make informed financial decisions with our intuitive platform.
             </p>
-          </div>
-
-          {/* Feature Cards */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-3">
-                <PieChart size={20} className="text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Visual Analytics</h3>
-              <p className="text-sm text-gray-600">Track spending with beautiful charts</p>
-            </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center mb-3">
-                <TrendingUp size={20} className="text-indigo-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Smart Insights</h3>
-              <p className="text-sm text-gray-600">Get personalized recommendations</p>
-            </div>
-          </div>
-
-          {/* Trust Indicators */}
-          <div className="flex items-center gap-6 text-gray-500 text-sm pt-4">
-            <div className="flex items-center gap-2">
-              <Shield size={16} strokeWidth={2} />
-              <span>Bank-level security</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>Real-time sync</span>
-            </div>
-          </div>
+          </div>     
         </div>
 
         {/* Right Side - Login Form */}

@@ -23,6 +23,11 @@ import {
 } from 'recharts';
 import api from '../config/api';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import WeeklyTrendsChart from '../components/WeeklyTrendsChart';
+import DailyPatternsChart from '../components/DailyPatternsChart';
+import SpendingHeatmapChart from '../components/SpendingHeatmapChart';
+import TransactionVolumeChart from '../components/TransactionVolumeChart';
+import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
@@ -35,6 +40,22 @@ function Dashboard() {
     startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
     endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd')
   });
+
+  // New chart data states
+  const [weeklyTrends, setWeeklyTrends] = useState([]);
+  const [dailyPatterns, setDailyPatterns] = useState([]);
+  const [spendingHeatmap, setSpendingHeatmap] = useState([]);
+  const [transactionVolume, setTransactionVolume] = useState([]);
+
+  // Filter and chart toggle states
+  const [filters, setFilters] = useState({
+    dateRange: {},
+    amountRange: {},
+    weeklyPeriod: '12',
+    dailyPeriod: '30',
+    volumePeriod: 'week'
+  });
+  const [activeCharts, setActiveCharts] = useState(['weekly', 'daily']);
 
   useEffect(() => {
     fetchAnalytics();
@@ -70,6 +91,51 @@ function Dashboard() {
     }
   };
 
+  const fetchAdvancedAnalytics = async () => {
+    try {
+      const promises = [];
+      
+      if (activeCharts.includes('weekly')) {
+        promises.push(
+          api.get('/analytics/weekly-trends', {
+            params: { weeks: filters.weeklyPeriod }
+          }).then(res => setWeeklyTrends(res.data))
+        );
+      }
+      
+      if (activeCharts.includes('daily')) {
+        promises.push(
+          api.get('/analytics/daily-patterns', {
+            params: { days: filters.dailyPeriod }
+          }).then(res => setDailyPatterns(res.data))
+        );
+      }
+      
+      if (activeCharts.includes('heatmap')) {
+        promises.push(
+          api.get('/analytics/spending-heatmap', {
+            params: { months: 6 }
+          }).then(res => setSpendingHeatmap(res.data))
+        );
+      }
+      
+      if (activeCharts.includes('volume')) {
+        promises.push(
+          api.get('/analytics/transaction-volume', {
+            params: { 
+              period: filters.volumePeriod,
+              periods: 12 
+            }
+          }).then(res => setTransactionVolume(res.data))
+        );
+      }
+      
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Error fetching advanced analytics:', error);
+    }
+  };
+
   const handleQuickFilter = (days) => {
     const end = new Date();
     const start = subDays(end, days);
@@ -78,6 +144,25 @@ function Dashboard() {
       endDate: format(end, 'yyyy-MM-dd')
     });
   };
+
+  const handleToggleChart = (chartId) => {
+    setActiveCharts(prev => 
+      prev.includes(chartId) 
+        ? prev.filter(id => id !== chartId)
+        : [...prev, chartId]
+    );
+  };
+
+  const handleFiltersChange = (newFilters) => {
+    setFilters(newFilters);
+  };
+
+  // Fetch advanced analytics when filters or active charts change
+  useEffect(() => {
+    if (activeCharts.length > 0) {
+      fetchAdvancedAnalytics();
+    }
+  }, [filters, activeCharts]);
 
   // Safe number formatting helper
   const formatCurrency = (value) => {
@@ -125,6 +210,18 @@ function Dashboard() {
           className="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
         >
           🗓️ This Month
+        </button>
+        <button
+          onClick={() => handleQuickFilter(90)}
+          className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+        >
+          📈 Last 3 Months
+        </button>
+        <button
+          onClick={() => handleQuickFilter(365)}
+          className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+        >
+          🎯 Last Year
         </button>
         <div className="flex gap-3 ml-auto">
           <input
@@ -291,6 +388,33 @@ function Dashboard() {
           <div className="h-80 flex items-center justify-center text-gray-500">
             No monthly data available
           </div>
+        )}
+      </div>
+
+      {/* Advanced Filters and Chart Controls */}
+      <AdvancedFilterPanel
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        onToggleChart={handleToggleChart}
+        activeCharts={activeCharts}
+      />
+
+      {/* Advanced Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {activeCharts.includes('weekly') && (
+          <WeeklyTrendsChart data={weeklyTrends} height={350} />
+        )}
+        
+        {activeCharts.includes('daily') && (
+          <DailyPatternsChart data={dailyPatterns} height={350} />
+        )}
+        
+        {activeCharts.includes('heatmap') && (
+          <SpendingHeatmapChart data={spendingHeatmap} height={350} />
+        )}
+        
+        {activeCharts.includes('volume') && (
+          <TransactionVolumeChart data={transactionVolume} height={350} />
         )}
       </div>
 
