@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Database, CheckCircle, AlertTriangle, Eye, X, Plus } from 'lucide-react';
 import api from '../config/api';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 const TransactionHistoryUpload = () => {
+  const { formatCurrency } = useCurrency();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [extractedHistory, setExtractedHistory] = useState(null);
   const [categories, setCategories] = useState([]);
   const [categoryMappings, setCategoryMappings] = useState({});
   const [selectedTransactions, setSelectedTransactions] = useState([]);
+  const [editableTransactions, setEditableTransactions] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [importing, setImporting] = useState(false);
@@ -72,8 +75,21 @@ const TransactionHistoryUpload = () => {
         }
       });
 
-      setExtractedHistory(response.data.data);
-      setSelectedTransactions(response.data.data.transactions.map((_, index) => index));
+      const extractionResult = response.data.data;
+      
+      console.log('Extraction result:', extractionResult);
+      console.log('Success:', extractionResult.success);
+      console.log('Data:', extractionResult.data);
+      console.log('Data length:', extractionResult.data?.length);
+      
+      if (!extractionResult.success || !extractionResult.data || extractionResult.data.length === 0) {
+        setError(extractionResult.error || 'No transactions found in the uploaded file');
+        return;
+      }
+      
+      setExtractedHistory(extractionResult);
+      setEditableTransactions([...extractionResult.data]); // Create editable copy
+      setSelectedTransactions(extractionResult.data.map((_, index) => index));
       setSuccess('Transaction history processed successfully! Review and select transactions to import.');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to process transaction history');
@@ -97,6 +113,19 @@ const TransactionHistoryUpload = () => {
     }));
   };
 
+  const handleTransactionEdit = (index, field, value) => {
+    setEditableTransactions(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const isValidDate = (dateString) => {
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date);
+  };
+
   const handleImportTransactions = async () => {
     if (selectedTransactions.length === 0) {
       setError('Please select at least one transaction to import');
@@ -110,26 +139,46 @@ const TransactionHistoryUpload = () => {
       return;
     }
 
+    // Check if all selected transactions have valid dates
+    const invalidDates = selectedTransactions.filter(index => !isValidDate(editableTransactions[index]?.date));
+    if (invalidDates.length > 0) {
+      setError('Please provide valid dates for all selected transactions');
+      return;
+    }
+
     setImporting(true);
     setError('');
 
     try {
-      const transactionsToImport = selectedTransactions.map(index => extractedHistory.transactions[index]);
+      const transactionsToImport = selectedTransactions.map(index => editableTransactions[index]);
       const mappingsArray = selectedTransactions.reduce((acc, index, arrayIndex) => {
         acc[arrayIndex] = categoryMappings[index];
         return acc;
       }, {});
+
+      console.log('Importing transactions:', {
+        transactionsToImport,
+        mappingsArray,
+        selectedTransactions,
+        categoryMappings
+      });
 
       const response = await api.post('/transactions/create-from-history', {
         transactions: transactionsToImport,
         categoryMappings: mappingsArray
       });
 
+      console.log('Import response:', response.data);
+      
       const { created, failed, summary } = response.data.data;
       setSuccess(`Successfully imported ${summary.created} transactions. ${summary.failed > 0 ? `${summary.failed} failed.` : ''}`);
       
       if (summary.failed > 0) {
         console.log('Import errors:', response.data.data.errors);
+        // Show the first error to help debugging
+        if (response.data.data.errors && response.data.data.errors.length > 0) {
+          setError(`Import failed: ${response.data.data.errors[0]}`);
+        }
       }
 
       // Reset form after successful import
@@ -150,10 +199,10 @@ const TransactionHistoryUpload = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedTransactions.length === extractedHistory?.transactions.length) {
+    if (selectedTransactions.length === (extractedHistory?.data?.length || 0)) {
       setSelectedTransactions([]);
     } else {
-      setSelectedTransactions(extractedHistory?.transactions.map((_, index) => index) || []);
+      setSelectedTransactions(extractedHistory?.data?.map((_, index) => index) || []);
     }
   };
 
@@ -283,7 +332,7 @@ const TransactionHistoryUpload = () => {
                 <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-blue-50 rounded-xl">
                     <p className="text-sm text-blue-600 font-medium">Total Transactions</p>
-                    <p className="text-2xl font-bold text-blue-700">{extractedHistory.transactions.length}</p>
+                    <p className="text-2xl font-bold text-blue-700">{extractedHistory.data?.length || 0}</p>
                   </div>
                   <div className="p-4 bg-green-50 rounded-xl">
                     <p className="text-sm text-green-600 font-medium">Selected</p>
@@ -291,7 +340,7 @@ const TransactionHistoryUpload = () => {
                   </div>
                   <div className="p-4 bg-purple-50 rounded-xl">
                     <p className="text-sm text-purple-600 font-medium">Confidence</p>
-                    <p className="text-2xl font-bold text-purple-700">{Math.round(extractedHistory.confidence)}%</p>
+                    <p className="text-2xl font-bold text-purple-700">{extractedHistory.success ? '100' : '0'}%</p>
                   </div>
                 </div>
 
@@ -301,7 +350,7 @@ const TransactionHistoryUpload = () => {
                     onClick={toggleSelectAll}
                     className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                   >
-                    {selectedTransactions.length === extractedHistory.transactions.length ? 'Deselect All' : 'Select All'}
+                    {selectedTransactions.length === (extractedHistory.data?.length || 0) ? 'Deselect All' : 'Select All'}
                   </button>
                   
                   {selectedTransactions.length > 0 && (
@@ -339,33 +388,60 @@ const TransactionHistoryUpload = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {extractedHistory.transactions.map((transaction, index) => (
-                        <tr key={index} className={selectedTransactions.includes(index) ? 'bg-blue-50' : 'hover:bg-gray-50'}>
+                      {editableTransactions.map((transaction, index) => {
+                        const isValidDateValue = isValidDate(transaction.date);
+                        return (
+                          <tr key={index} className={selectedTransactions.includes(index) ? 'bg-blue-50' : 'hover:bg-gray-50'}>
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedTransactions.includes(index)}
+                                onChange={() => handleTransactionToggle(index)}
+                                className="h-4 w-4 text-blue-600 rounded"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="date"
+                                value={transaction.date && isValidDateValue ? transaction.date : ''}
+                                onChange={(e) => handleTransactionEdit(index, 'date', e.target.value)}
+                                className={`text-sm border rounded-md px-2 py-1 focus:ring-2 focus:border-blue-500 ${
+                                  !isValidDateValue ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                                }`}
+                                placeholder="Select date"
+                              />
+                              {!isValidDateValue && (
+                                <div className="text-xs text-red-600 mt-1">Invalid date - please select a valid date</div>
+                              )}
+                            </td>
                           <td className="px-4 py-3">
                             <input
-                              type="checkbox"
-                              checked={selectedTransactions.includes(index)}
-                              onChange={() => handleTransactionToggle(index)}
-                              className="h-4 w-4 text-blue-600 rounded"
+                              type="text"
+                              value={transaction.description || ''}
+                              onChange={(e) => handleTransactionEdit(index, 'description', e.target.value)}
+                              className="text-sm border border-gray-300 rounded-md px-2 py-1 w-full focus:ring-2 focus:border-blue-500"
+                              placeholder="Enter description"
                             />
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {new Date(transaction.date).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate">
-                            {transaction.description}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              transaction.type === 'INCOME' 
+                              transaction.type === 'income' 
                                 ? 'bg-green-100 text-green-800' 
                                 : 'bg-red-100 text-red-800'
                             }`}>
-                              {transaction.type}
+                              {(transaction.type || 'expense').toUpperCase()}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
-                            ${transaction.amount.toFixed(2)}
+                          <td className="px-4 py-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={transaction.amount || ''}
+                              onChange={(e) => handleTransactionEdit(index, 'amount', parseFloat(e.target.value) || 0)}
+                              className="text-sm border border-gray-300 rounded-md px-2 py-1 w-full text-right focus:ring-2 focus:border-blue-500"
+                              placeholder="0.00"
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <select
@@ -376,7 +452,7 @@ const TransactionHistoryUpload = () => {
                             >
                               <option value="">Select category</option>
                               {categories
-                                .filter(cat => cat.type === transaction.type)
+                                .filter(cat => cat.type === (transaction.type?.toUpperCase() || 'EXPENSE'))
                                 .map(category => (
                                   <option key={category._id} value={category._id}>
                                     {category.name}
@@ -385,7 +461,8 @@ const TransactionHistoryUpload = () => {
                             </select>
                           </td>
                         </tr>
-                      ))}
+                      )}
+                      )}
                     </tbody>
                   </table>
                 </div>

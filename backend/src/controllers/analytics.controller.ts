@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Transaction } from '../models/Transaction';
 import { TransactionType } from '../models/Category';
+import { User } from '../models/User';
+import { currencyService } from '../services/currency.service';
 
 interface AuthRequest extends Request {
   userId?: string;

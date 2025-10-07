@@ -3,6 +3,32 @@ import fs from 'fs';
 import path from 'path';
 const pdfParse = require('pdf-parse');
 
+// Helper function to convert date formats
+const convertDateFormat = (dateStr: string): string => {
+  // Handle DD-MM-YYYY format and convert to YYYY-MM-DD
+  const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Handle DD/MM/YYYY format
+  const ddmmyyyySlashMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyySlashMatch) {
+    const [, day, month, year] = ddmmyyyySlashMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // If already in YYYY-MM-DD format, return as is
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(dateStr)) {
+    return dateStr;
+  }
+  
+  // If no pattern matches, return original (will be handled as invalid later)
+  console.log('Warning: Could not parse date format:', dateStr);
+  return dateStr;
+};
+
 export interface ExtractedData {
   success: boolean;
   data?: {
@@ -276,28 +302,157 @@ const parseTransactionHistoryText = (text: string): ExtractedTransactionHistory 
       category?: string;
     }> = [];
 
-    for (const line of lines) {
-      // Look for patterns like: Date Description Amount
-      const transactionMatch = line.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})\s+(.+?)\s+([-+]?\$?\d+\.?\d*)/);
-      
-      if (transactionMatch) {
-        const [, date, description, amountStr] = transactionMatch;
-        const amount = Math.abs(parseFloat(amountStr.replace(/[^\d.-]/g, '')));
-        const type = amountStr.includes('-') || amountStr.includes('(') ? 'expense' : 'income';
+    console.log('Parsing transaction history text lines:', lines);
+    
+    // Test the specific case we know from terminal output
+    const testLine = "Income Rs. 25000 Investments 18-09-2025 Stocks";
+    console.log('Testing known line:', testLine);
+    const testMatch = testLine.match(/^(Income|Expense)\s+Rs\.\s*(\d+)\s+(.+?)\s+(\d{1,2}-\d{1,2}-\d{4})\s+(.+)$/i);
+    console.log('Test match result:', testMatch);
 
-        transactions.push({
-          date,
-          description: description.trim(),
-          amount,
-          type,
-          category: type === 'expense' ? 'Other Expenses' : 'Other Income'
-        });
+    // Look for header line to identify table format
+    let headerIndex = -1;
+    let isTableFormat = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase();
+      if (line.includes('type') && line.includes('amount') && line.includes('date')) {
+        headerIndex = i;
+        isTableFormat = true;
+        console.log('Found table header at line:', i, lines[i]);
+        break;
       }
     }
 
+    if (isTableFormat && headerIndex >= 0) {
+      // Parse table format data
+      for (let i = headerIndex + 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.length === 0) continue;
+        
+        console.log('Processing line:', line);
+        
+        // Try multiple patterns for table row parsing
+        // Pattern 1: Type Amount Category Date Description
+        // Example: Income Rs. 25000 Investments 18-09-2025 Stocks
+        const tableMatch = line.match(/^(Income|Expense)\s+Rs\.\s*(\d+)\s+(.+?)\s+(\d{1,2}-\d{1,2}-\d{4})\s+(.+)$/i);
+        
+        if (tableMatch) {
+          const [, typeStr, amountStr, category, date, description] = tableMatch;
+          const amount = parseFloat(amountStr.replace(/[^\d.]/g, ''));
+          const type = typeStr.toLowerCase() as 'income' | 'expense';
+
+          // Convert date from DD-MM-YYYY to YYYY-MM-DD format
+          const dateFormatted = convertDateFormat(date.trim());
+
+          if (amount > 0) {
+            transactions.push({
+              date: dateFormatted,
+              description: description.trim(),
+              amount,
+              type,
+              category: category.trim()
+            });
+            console.log('Parsed transaction (Pattern 1):', { type, amount, category: category.trim(), date: dateFormatted, description: description.trim() });
+          }
+        } else {
+          // Pattern 2: More flexible - split by spaces and try to identify fields
+          const parts = line.split(/\s+/);
+          console.log('Line parts:', parts);
+          
+          if (parts.length >= 5) {
+            const typeStr = parts[0];
+            if (/^(Income|Expense)$/i.test(typeStr)) {
+              // Find amount (number with Rs., currency symbols, or just digits)
+              let amountIndex = -1;
+              let amountValue = 0;
+              
+              for (let j = 1; j < parts.length; j++) {
+                const part = parts[j];
+                if (/(?:Rs\.?\s*)?(\d+(?:[,\s]*\d{3})*(?:\.\d{2})?)/.test(part)) {
+                  amountValue = parseFloat(part.replace(/[^\d.]/g, ''));
+                  if (amountValue > 0) {
+                    amountIndex = j;
+                    break;
+                  }
+                }
+              }
+              
+              // Find date pattern
+              let dateIndex = -1;
+              let dateValue = '';
+              
+              for (let j = 1; j < parts.length; j++) {
+                const part = parts[j];
+                if (/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/.test(part)) {
+                  dateValue = part;
+                  dateIndex = j;
+                  break;
+                }
+              }
+              
+              if (amountIndex > 0 && dateIndex > 0 && amountValue > 0) {
+                const type = typeStr.toLowerCase() as 'income' | 'expense';
+                
+                // Category is between amount and date (or default)
+                let category = 'Other';
+                if (dateIndex > amountIndex + 1) {
+                  category = parts.slice(amountIndex + 1, dateIndex).join(' ');
+                }
+                
+                // Description is after date
+                let description = 'Transaction';
+                if (dateIndex < parts.length - 1) {
+                  description = parts.slice(dateIndex + 1).join(' ');
+                }
+                
+                transactions.push({
+                  date: convertDateFormat(dateValue.trim()),
+                  description: description.trim(),
+                  amount: amountValue,
+                  type,
+                  category: category.trim()
+                });
+                console.log('Parsed transaction (Pattern 2):', { type, amount: amountValue, category: category.trim(), date: dateValue, description: description.trim() });
+              }
+            }
+          }
+        }
+        
+        if (!tableMatch) {
+          console.log('Line did not match pattern 1:', line);
+        }
+      }
+    } else {
+      // Fallback to original parsing for other formats
+      for (const line of lines) {
+        // Look for patterns like: Date Description Amount
+        const transactionMatch = line.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+([-+]?\$?(?:Rs\.?\s*)?\d+\.?\d*)/);
+        
+        if (transactionMatch) {
+          const [, date, description, amountStr] = transactionMatch;
+          const amount = Math.abs(parseFloat(amountStr.replace(/[^\d.-]/g, '')));
+          const type = amountStr.includes('-') || amountStr.includes('(') ? 'expense' : 'income';
+
+          if (amount > 0) {
+            transactions.push({
+              date: convertDateFormat(date),
+              description: description.trim(),
+              amount,
+              type,
+              category: type === 'expense' ? 'Other Expenses' : 'Other Income'
+            });
+          }
+        }
+      }
+    }
+
+    console.log('Total transactions parsed:', transactions.length);
+
     return {
-      success: true,
-      data: transactions
+      success: transactions.length > 0,
+      data: transactions,
+      error: transactions.length === 0 ? 'No valid transactions found in the document' : undefined
     };
   } catch (error) {
     console.error('Error parsing transaction history text:', error);

@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes';
 import transactionRoutes from './routes/transaction.routes';
 import categoryRoutes from './routes/category.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import userRoutes from './routes/user.routes';
 
 // Import middleware
 import { errorHandler } from './middlewares/error.middleware';
@@ -57,6 +58,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/users', userRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

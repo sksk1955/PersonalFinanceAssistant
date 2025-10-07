@@ -6,6 +6,7 @@ A full-stack web application designed to help users track, manage, and understan
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![React](https://img.shields.io/badge/react-19.1.1-blue.svg)
 
+
 ## 🌟 Features
 
 ### Core Features

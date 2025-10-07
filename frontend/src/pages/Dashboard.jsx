@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 import api from '../config/api';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { useCurrency } from '../contexts/CurrencyContext';
 import WeeklyTrendsChart from '../components/WeeklyTrendsChart';
 import DailyPatternsChart from '../components/DailyPatternsChart';
 import SpendingHeatmapChart from '../components/SpendingHeatmapChart';
@@ -32,6 +33,7 @@ import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
 function Dashboard() {
+  const { formatCurrency, userCurrency } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ income: 0, expense: 0, balance: 0, transactionCount: 0 });
   const [expensesByCategory, setExpensesByCategory] = useState([]);
@@ -164,11 +166,6 @@ function Dashboard() {
     }
   }, [filters, activeCharts]);
 
-  // Safe number formatting helper
-  const formatCurrency = (value) => {
-    return (value || 0).toFixed(2);
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -181,7 +178,7 @@ function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
       <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">Financial Dashboard</h1>
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">Your Dashboard</h1>
         <p className="text-gray-600 text-lg">📊 Overview of your financial activities</p>
       </div>
 
@@ -248,7 +245,7 @@ function Dashboard() {
             </div>
           </div>
           <p className="text-sm text-gray-500 mb-2 font-medium">💰 Total Income</p>
-          <p className="text-3xl font-bold text-gray-900">${formatCurrency(summary.income)}</p>
+          <p className="text-3xl font-bold text-gray-900">{formatCurrency(summary.income)}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
@@ -258,7 +255,7 @@ function Dashboard() {
             </div>
           </div>
           <p className="text-sm text-gray-500 mb-2 font-medium">💸 Total Expenses</p>
-          <p className="text-3xl font-bold text-gray-900">${formatCurrency(summary.expense)}</p>
+          <p className="text-3xl font-bold text-gray-900">{formatCurrency(summary.expense)}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
@@ -269,7 +266,7 @@ function Dashboard() {
           </div>
           <p className="text-sm text-gray-500 mb-2 font-medium">🏦 Balance</p>
           <p className={`text-3xl font-bold ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            ${formatCurrency(summary.balance)}
+            {formatCurrency(summary.balance)}
           </p>
         </div>
 
@@ -299,13 +296,13 @@ function Dashboard() {
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
-                  label={(entry) => `${entry.categoryName}: $${(entry.amount || 0).toFixed(0)}`}
+                  label={(entry) => `${entry.categoryName}: ${formatCurrency(entry.amount || 0)}`}
                 >
                   {expensesByCategory.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => `$${(value || 0).toFixed(2)}`} />
+                <Tooltip formatter={(value) => formatCurrency(value || 0)} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -324,7 +321,7 @@ function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="categoryName" angle={-45} textAnchor="end" height={100} />
                 <YAxis />
-                <Tooltip formatter={(value) => `$${(value || 0).toFixed(2)}`} />
+                <Tooltip formatter={(value) => formatCurrency(value || 0)} />
                 <Bar dataKey="amount" fill="#3B82F6" />
               </BarChart>
             </ResponsiveContainer>
@@ -351,10 +348,10 @@ function Dashboard() {
               <YAxis 
                 tick={{ fill: '#6B7280', fontSize: 12 }}
                 axisLine={{ stroke: '#E5E7EB' }}
-                tickFormatter={(value) => `$${value.toLocaleString()}`}
+                tickFormatter={(value) => formatCurrency(value)}
               />
               <Tooltip 
-                formatter={(value, name) => [`$${(value || 0).toLocaleString()}`, name]}
+                formatter={(value, name) => [formatCurrency(value || 0), name]}
                 labelStyle={{ color: '#374151' }}
                 contentStyle={{ 
                   backgroundColor: 'white', 
@@ -434,7 +431,7 @@ function Dashboard() {
                       {category.categoryName || 'Unknown'}
                     </span>
                     <span className="text-sm text-gray-600">
-                      ${categoryAmount.toFixed(2)} ({percentage.toFixed(1)}%)
+                      {formatCurrency(categoryAmount)} ({percentage.toFixed(1)}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">

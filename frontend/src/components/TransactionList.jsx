@@ -1,7 +1,9 @@
 import { Edit2, Trash2, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 function TransactionList({ transactions, loading, onEdit, onDelete, pagination, onPageChange }) {
+  const { formatCurrency } = useCurrency();
   if (loading) {
     return (
       <div className="bg-white rounded-2xl shadow-lg p-12 text-center border border-gray-100">
@@ -95,7 +97,7 @@ function TransactionList({ transactions, loading, onEdit, onDelete, pagination, 
                   <span className={`text-base font-bold ${
                     transaction.type === 'INCOME' ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {transaction.type === 'INCOME' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                    {transaction.type === 'INCOME' ? '+' : '-'}{formatCurrency(transaction.amount, transaction.currency)}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">

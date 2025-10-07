@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
-import { X, DollarSign, Calendar, FileText, Tag, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, DollarSign, Calendar, FileText, Tag, TrendingUp, TrendingDown, Globe } from 'lucide-react';
 import { format } from 'date-fns';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 function TransactionModal({ transaction, categories, onSave, onClose }) {
+  const { userCurrency, supportedCurrencies, getCurrencySymbol } = useCurrency();
   const [formData, setFormData] = useState({
     type: 'EXPENSE',
     amount: '',
     categoryId: '',
     date: format(new Date(), 'yyyy-MM-dd'),
-    description: ''
+    description: '',
+    currency: userCurrency
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,10 +23,11 @@ function TransactionModal({ transaction, categories, onSave, onClose }) {
         amount: transaction.amount.toString(),
         categoryId: transaction.categoryId || transaction.category?._id || transaction.category?.id || '',
         date: format(new Date(transaction.date), 'yyyy-MM-dd'),
-        description: transaction.description || ''
+        description: transaction.description || '',
+        currency: transaction.currency || userCurrency
       });
     }
-  }, [transaction]);
+  }, [transaction, userCurrency]);
 
   const filteredCategories = categories.filter(c => c.type === formData.type);
 
@@ -124,26 +128,52 @@ function TransactionModal({ transaction, categories, onSave, onClose }) {
               </div>
             </div>
 
-            {/* Amount */}
-            <div>
-              <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 mb-2">
-                Amount
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <DollarSign size={20} className="text-gray-400" />
+            {/* Amount & Currency */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Amount
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-400 font-semibold">{getCurrencySymbol(formData.currency)}</span>
+                  </div>
+                  <input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formData.amount}
+                    onChange={handleChange}
+                    className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-lg font-semibold"
+                    placeholder="0.00"
+                  />
                 </div>
-                <input
-                  id="amount"
-                  name="amount"
-                  type="number"
-                  step="0.01"
-                  required
-                  value={formData.amount}
-                  onChange={handleChange}
-                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-lg font-semibold"
-                  placeholder="0.00"
-                />
+              </div>
+              
+              <div>
+                <label htmlFor="currency" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Currency
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Globe size={20} className="text-gray-400" />
+                  </div>
+                  <select
+                    id="currency"
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleChange}
+                    className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-semibold appearance-none bg-white"
+                  >
+                    {supportedCurrencies.map((currency) => (
+                      <option key={currency.code} value={currency.code}>
+                        {currency.code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 

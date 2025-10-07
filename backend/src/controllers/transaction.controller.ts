@@ -369,18 +369,24 @@ export const createTransactionsFromHistory = async (req: AuthRequest, res: Respo
     const createdTransactions: any[] = [];
     const errors: string[] = [];
 
+    console.log('Creating transactions from history:', {
+      transactionCount: transactions.length,
+      categoryMappings,
+      userId: req.userId
+    });
+
     for (let i = 0; i < transactions.length; i++) {
       const txn = transactions[i];
+      let categoryId: mongoose.Types.ObjectId | null = null;
       
       try {
         // Apply category mapping if provided
-        let categoryId: mongoose.Types.ObjectId | null = null;
         if (categoryMappings && categoryMappings[i]) {
           categoryId = new mongoose.Types.ObjectId(categoryMappings[i]);
         } else {
           // Try to find a default category for the transaction type
           const defaultCategory = await Category.findOne({ 
-            type: txn.type 
+            type: txn.type.toUpperCase() as TransactionType
           });
           if (defaultCategory) {
             categoryId = defaultCategory._id;
@@ -394,7 +400,7 @@ export const createTransactionsFromHistory = async (req: AuthRequest, res: Respo
 
         const transaction = await Transaction.create({
           amount: parseFloat(txn.amount),
-          type: txn.type,
+          type: txn.type.toUpperCase() as TransactionType,
           categoryId,
           userId: req.userId,
           date: new Date(txn.date),
@@ -407,6 +413,11 @@ export const createTransactionsFromHistory = async (req: AuthRequest, res: Respo
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`Error creating transaction ${i + 1}:`, {
+          transaction: txn,
+          error: errorMessage,
+          categoryId
+        });
         errors.push(`Transaction ${i + 1}: ${errorMessage}`);
       }
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Filter, Download, Upload, Database } from 'lucide-react';
 import api from '../config/api';
+import { useCurrency } from '../contexts/CurrencyContext';
 import TransactionList from '../components/TransactionList';
 import TransactionModal from '../components/TransactionModal';
 import FilterModal from '../components/FilterModal';

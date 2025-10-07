@@ -76,7 +76,7 @@ function Register() {
                 <DollarSign size={28} className="text-white" strokeWidth={2.5} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Finance Assistant</h1>
+                <h1 className="text-2xl font-bold text-gray-900">FinSight</h1>
                 <p className="text-sm text-gray-600">Smart Money Management</p>
               </div>
             </div>
@@ -104,7 +104,7 @@ function Register() {
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <DollarSign size={24} className="text-white" strokeWidth={2.5} />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">Finance Assistant</h1>
+              <h1 className="text-2xl font-bold text-gray-900">FinSight</h1>
             </div>
           </div>
 

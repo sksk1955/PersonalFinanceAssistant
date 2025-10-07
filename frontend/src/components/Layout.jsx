@@ -9,16 +9,21 @@ import {
   X,
   DollarSign,
   Database,
-  Sparkles
+  Sparkles,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrency } from '../contexts/CurrencyContext';
+import ProfileModal from './ProfileModal';
 import { useState } from 'react';
 
 function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { userCurrency, getCurrencySymbol } = useCurrency();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -47,9 +52,9 @@ function Layout({ children }) {
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  Finance Assistant
+                  FinSight
                 </h1>
-                <p className="text-xs text-gray-500 hidden sm:block">Manage your wealth</p>
+                <p className="text-xs text-gray-500 hidden sm:block">Smart Financial Management {getCurrencySymbol(userCurrency)}</p>
               </div>
             </div>
 
@@ -90,14 +95,23 @@ function Layout({ children }) {
                 </div>
               </div>
 
-              {/* Desktop Logout Button */}
-              <button
-                onClick={handleLogout}
-                className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-300 font-medium shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 transform hover:scale-105"
-              >
-                <LogOut size={18} />
-                <span className="text-sm">Logout</span>
-              </button>
+              {/* Desktop Profile & Logout Buttons */}
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  onClick={() => setProfileModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 rounded-xl transition-all duration-300 font-medium shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transform hover:scale-105"
+                >
+                  <Settings size={18} />
+                  <span className="text-sm">Profile</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-300 font-medium shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 transform hover:scale-105"
+                >
+                  <LogOut size={18} />
+                  <span className="text-sm">Logout</span>
+                </button>
+              </div>
 
               {/* Mobile menu button */}
               <button
@@ -145,6 +159,16 @@ function Layout({ children }) {
                 </div>
                 <button
                   onClick={() => {
+                    setProfileModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 rounded-xl transition-all duration-300 font-medium shadow-lg w-full"
+                >
+                  <Settings size={20} />
+                  <span>Profile</span>
+                </button>
+                <button
+                  onClick={() => {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
@@ -172,7 +196,7 @@ function Layout({ children }) {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <DollarSign size={18} className="text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-700">Finance Assistant</span>
+              <span className="text-sm font-semibold text-gray-700">FinSight</span>
             </div>
             <p className="text-sm text-gray-600 font-medium flex items-center gap-2">
               <Sparkles size={16} className="text-blue-500" />
@@ -181,6 +205,12 @@ function Layout({ children }) {
           </div>
         </div>
       </footer>
+
+      {/* Profile Modal */}
+      <ProfileModal 
+        isOpen={profileModalOpen} 
+        onClose={() => setProfileModalOpen(false)} 
+      />
     </div>
   );
 }

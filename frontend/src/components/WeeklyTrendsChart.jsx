@@ -1,7 +1,9 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 const WeeklyTrendsChart = ({ data, height = 300 }) => {
+  const { formatCurrency } = useCurrency();
   return (
     <div className="bg-black/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-lg">
       <h3 className="text-xl font-semibold text-black mb-4">Weekly Trends</h3>
@@ -24,7 +26,7 @@ const WeeklyTrendsChart = ({ data, height = 300 }) => {
               borderRadius: '8px',
               color: '#333'
             }}
-            formatter={(value, name) => [`$${value.toLocaleString()}`, name]}
+            formatter={(value, name) => [formatCurrency(value), name]}
           />
           <Legend />
           <Line 
