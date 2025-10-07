@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Filter, Download, Upload } from 'lucide-react';
+import { Plus, Filter, Download, Upload, Database } from 'lucide-react';
 import api from '../config/api';
 import TransactionList from '../components/TransactionList';
 import TransactionModal from '../components/TransactionModal';
@@ -171,11 +171,19 @@ function Transactions() {
         </button>
         
         <a
-          href="/receipt-upload"
+          href="/upload"
           className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all duration-200 shadow-sm hover:shadow-md"
         >
           <Upload size={20} className="text-gray-600" />
           <span className="text-gray-700">Upload Receipt</span>
+        </a>
+        
+        <a
+          href="/upload-history"
+          className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 shadow-sm hover:shadow-md"
+        >
+          <Database size={20} className="text-gray-600" />
+          <span className="text-gray-700">Import History</span>
         </a>
       </div>
 

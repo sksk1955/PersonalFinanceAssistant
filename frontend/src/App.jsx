@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import ReceiptUpload from './pages/ReceiptUpload';
+import TransactionHistoryUpload from './pages/TransactionHistoryUpload';
 import './App.css';
 
 function App() {
@@ -45,6 +46,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ReceiptUpload />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/upload-history"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TransactionHistoryUpload />
                 </Layout>
               </ProtectedRoute>
             }

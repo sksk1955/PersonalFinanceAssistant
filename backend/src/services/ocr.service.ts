@@ -26,6 +26,27 @@ export interface ExtractedData {
   rawText: string;
 }
 
+export interface ExtractedTransaction {
+  date: string;
+  description: string;
+  amount: number;
+  type: 'INCOME' | 'EXPENSE';
+  category?: string;
+  balance?: number;
+}
+
+export interface ExtractedTransactionHistory {
+  transactions: ExtractedTransaction[];
+  accountInfo?: {
+    accountNumber?: string;
+    accountName?: string;
+    bankName?: string;
+    statementPeriod?: string;
+  };
+  rawText: string;
+  confidence: number;
+}
+
 export const extractReceiptData = async (filePath: string, mimeType: string): Promise<ExtractedData> => {
   try {
     let rawText = '';
@@ -57,6 +78,40 @@ export const extractReceiptData = async (filePath: string, mimeType: string): Pr
       console.error('Error cleaning up file:', unlinkError);
     }
     throw new Error('Failed to extract data from receipt');
+  }
+};
+
+export const extractTransactionHistory = async (filePath: string, mimeType: string): Promise<ExtractedTransactionHistory> => {
+  try {
+    let rawText = '';
+
+    if (mimeType === 'application/pdf') {
+      // Extract text from PDF
+      const dataBuffer = fs.readFileSync(filePath);
+      const pdfData = await pdfParse(dataBuffer);
+      rawText = pdfData.text;
+    } else {
+      // Extract text from image using OCR
+      const { data: { text } } = await Tesseract.recognize(filePath, 'eng');
+      rawText = text;
+    }
+
+    // Parse tabular transaction data
+    const extractedHistory = parseTransactionHistory(rawText);
+    
+    // Clean up uploaded file
+    fs.unlinkSync(filePath);
+    
+    return extractedHistory;
+  } catch (error) {
+    console.error('Transaction history extraction error:', error);
+    // Clean up uploaded file even on error
+    try {
+      fs.unlinkSync(filePath);
+    } catch (unlinkError) {
+      console.error('Error cleaning up file:', unlinkError);
+    }
+    throw new Error('Failed to extract transaction history');
   }
 };
 
@@ -307,5 +362,154 @@ const parseReceiptText = (text: string): ExtractedData => {
     ? confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length 
     : 0.3;
 
+  
+  return result;
+};
+
+const parseTransactionHistory = (text: string): ExtractedTransactionHistory => {
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  const transactions: ExtractedTransaction[] = [];
+  
+  // Initialize result
+  const result: ExtractedTransactionHistory = {
+    transactions: [],
+    rawText: text,
+    confidence: 0,
+    accountInfo: {}
+  };
+
+  // Extract account information
+  const accountNumberMatch = text.match(/account\s*(?:number|no\.?|#)?\s*:?\s*(\d{4,20})/i);
+  if (accountNumberMatch) {
+    result.accountInfo!.accountNumber = accountNumberMatch[1];
+  }
+
+  const bankNameMatch = text.match(/(?:bank|credit\s*union|financial)\s*(?:name|of)?\s*:?\s*([a-z\s&]+(?:bank|credit\s*union|financial))/i);
+  if (bankNameMatch) {
+    result.accountInfo!.bankName = bankNameMatch[1].trim();
+  }
+
+  // Common date formats: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY
+  const dateRegex = /(?:(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})|(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2}))/;
+  
+  // Amount patterns: $123.45, 123.45, (123.45), -123.45
+  const amountRegex = /(?:[\$]?[\+\-]?\s*(\d{1,6}(?:,\d{3})*\.?\d{0,2})|\((\d{1,6}(?:,\d{3})*\.?\d{0,2})\))/;
+  
+  // Balance patterns
+  const balanceRegex = /balance\s*:?\s*[\$]?[\+\-]?\s*(\d{1,6}(?:,\d{3})*\.?\d{0,2})/i;
+
+  let validTransactionCount = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const dateMatch = line.match(dateRegex);
+    
+    if (dateMatch) {
+      // Try to extract transaction data from this line and potentially next lines
+      let transactionLine = line;
+      let nextLineIndex = i + 1;
+      
+      // Sometimes transaction data spans multiple lines
+      while (nextLineIndex < lines.length && 
+             !lines[nextLineIndex].match(dateRegex) && 
+             nextLineIndex - i < 3) {
+        transactionLine += ' ' + lines[nextLineIndex];
+        nextLineIndex++;
+      }
+      
+      const amountMatch = transactionLine.match(amountRegex);
+      
+      if (amountMatch) {
+        let amount = parseFloat((amountMatch[1] || amountMatch[2] || '0').replace(/,/g, ''));
+        
+        // Determine transaction type based on context and amount
+        let type: 'INCOME' | 'EXPENSE' = 'EXPENSE';
+        const lowerLine = transactionLine.toLowerCase();
+        
+        // Check for income indicators
+        if (lowerLine.includes('deposit') || 
+            lowerLine.includes('credit') || 
+            lowerLine.includes('salary') ||
+            lowerLine.includes('pay') ||
+            lowerLine.includes('transfer in') ||
+            lowerLine.includes('interest') ||
+            lowerLine.includes('dividend') ||
+            lowerLine.includes('refund')) {
+          type = 'INCOME';
+        }
+        
+        // Handle negative amounts (usually expenses) and parentheses (also expenses)
+        if (amountMatch[2] || transactionLine.includes('(')) {
+          // Amount in parentheses = expense
+          type = 'EXPENSE';
+        } else if (transactionLine.includes('-') && amount > 0) {
+          // Negative amount = expense
+          type = 'EXPENSE';
+        }
+        
+        // Format date
+        let formattedDate: string;
+        if (dateMatch[1] && dateMatch[2] && dateMatch[3]) {
+          // MM/DD/YYYY or DD/MM/YYYY format
+          const month = parseInt(dateMatch[1]);
+          const day = parseInt(dateMatch[2]);
+          const year = parseInt(dateMatch[3]);
+          
+          // Assume MM/DD/YYYY if month > 12, otherwise DD/MM/YYYY
+          if (month > 12) {
+            formattedDate = `${year}-${String(dateMatch[1]).padStart(2, '0')}-${String(month).padStart(2, '0')}`;
+          } else {
+            formattedDate = `${year < 100 ? 2000 + year : year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          }
+        } else if (dateMatch[4] && dateMatch[5] && dateMatch[6]) {
+          // YYYY-MM-DD format
+          formattedDate = `${dateMatch[4]}-${String(dateMatch[5]).padStart(2, '0')}-${String(dateMatch[6]).padStart(2, '0')}`;
+        } else {
+          formattedDate = new Date().toISOString().split('T')[0];
+        }
+        
+        // Extract description (remove date and amount)
+        let description = transactionLine
+          .replace(dateRegex, '')
+          .replace(amountRegex, '')
+          .replace(/balance\s*:?\s*[\$]?[\+\-]?\s*\d{1,6}(?:,\d{3})*\.?\d{0,2}/i, '')
+          .replace(/\\s+/g, ' ')
+          .trim();
+        
+        // Clean up description
+        description = description
+          .replace(/^[\\s\\-\\*]+/, '')
+          .replace(/[\\s\\-\\*]+$/, '')
+          .replace(/\\s{2,}/g, ' ')
+          .trim();
+        
+        if (!description) {
+          description = type === 'INCOME' ? 'Income Transaction' : 'Expense Transaction';
+        }
+        
+        // Extract balance if present
+        const balanceMatch = transactionLine.match(balanceRegex);
+        const balance = balanceMatch ? parseFloat(balanceMatch[1].replace(/,/g, '')) : undefined;
+        
+        const transaction: ExtractedTransaction = {
+          date: formattedDate,
+          description: description.substring(0, 200), // Limit description length
+          amount: Math.abs(amount), // Always store as positive
+          type,
+          balance
+        };
+        
+        transactions.push(transaction);
+        validTransactionCount++;
+      }
+    }
+  }
+  
+  // Calculate confidence based on successful extractions
+  const confidence = Math.min(90, Math.max(10, (validTransactionCount / Math.max(lines.length / 4, 1)) * 100));
+  
+  result.transactions = transactions;
+  result.confidence = confidence;
+  
   return result;
 };

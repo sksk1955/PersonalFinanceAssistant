@@ -333,3 +333,100 @@ const buildDescription = (extractedData: any): string => {
   
   return parts.length > 0 ? parts.join(' - ') : 'Receipt transaction';
 };
+
+export const uploadTransactionHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    const filePath = req.file.path;
+    const mimeType = req.file.mimetype;
+
+    // Extract transaction history from PDF
+    const { extractTransactionHistory } = await import('../services/ocr.service');
+    const extractedHistory = await extractTransactionHistory(filePath, mimeType);
+
+    res.json({
+      message: 'Transaction history processed successfully',
+      data: extractedHistory
+    });
+  } catch (error) {
+    console.error('Upload transaction history error:', error);
+    res.status(500).json({ error: 'Failed to process transaction history' });
+  }
+};
+
+export const createTransactionsFromHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { transactions, categoryMappings } = req.body;
+
+    if (!transactions || !Array.isArray(transactions)) {
+      res.status(400).json({ error: 'Invalid transaction data' });
+      return;
+    }
+
+    const createdTransactions: any[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < transactions.length; i++) {
+      const txn = transactions[i];
+      
+      try {
+        // Apply category mapping if provided
+        let categoryId: mongoose.Types.ObjectId | null = null;
+        if (categoryMappings && categoryMappings[i]) {
+          categoryId = new mongoose.Types.ObjectId(categoryMappings[i]);
+        } else {
+          // Try to find a default category for the transaction type
+          const defaultCategory = await Category.findOne({ 
+            type: txn.type 
+          });
+          if (defaultCategory) {
+            categoryId = defaultCategory._id;
+          }
+        }
+
+        if (!categoryId) {
+          errors.push(`Transaction ${i + 1}: No category specified`);
+          continue;
+        }
+
+        const transaction = await Transaction.create({
+          amount: parseFloat(txn.amount),
+          type: txn.type,
+          categoryId,
+          userId: req.userId,
+          date: new Date(txn.date),
+          description: txn.description
+        });
+
+        // Populate category for response
+        await transaction.populate('categoryId', 'name type');
+        createdTransactions.push(transaction);
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`Transaction ${i + 1}: ${errorMessage}`);
+      }
+    }
+
+    res.json({
+      message: `Successfully created ${createdTransactions.length} transactions`,
+      data: {
+        created: createdTransactions,
+        errors: errors,
+        summary: {
+          total: transactions.length,
+          created: createdTransactions.length,
+          failed: errors.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Create transactions from history error:', error);
+    res.status(500).json({ error: 'Failed to create transactions' });
+  }
+};

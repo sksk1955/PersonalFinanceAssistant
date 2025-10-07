@@ -51,10 +51,10 @@ export const getSummary = async (req: AuthRequest, res: Response): Promise<void>
     const totalTransactions = incomeCount + expenseCount;
 
     res.json({
-      totalIncome,
-      totalExpenses,
+      income: totalIncome,
+      expense: totalExpenses,
       balance,
-      totalTransactions,
+      transactionCount: totalTransactions,
       incomeCount,
       expenseCount
     });
