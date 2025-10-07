@@ -445,15 +445,7 @@ This project follows best practices for code quality:
 - [ ] Implement dark mode
 - [ ] Mobile app (React Native)
 
-## 📄 License
-
-ISC License
-
-## 👥 Authors
-
-- Your Name - Initial work
-
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Tesseract.js for OCR functionality
 - Recharts for beautiful charts
