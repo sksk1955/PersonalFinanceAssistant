@@ -102,6 +102,8 @@ function ReceiptUpload() {
         }
       });
 
+      console.log('Full API response:', response.data);
+      console.log('Extracted data:', response.data.data);
       setExtractedData(response.data.data);
       setSuccess('Receipt processed successfully! Review the extracted data below.');
       setShowTransactionModal(true);
@@ -119,7 +121,9 @@ function ReceiptUpload() {
         <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
           Upload Receipt
         </h1>
-        <p className="text-gray-600 text-lg">Extract transaction data automatically with AI</p>
+        <p className="text-gray-600 text-lg mb-4">Extract transaction data automatically with advanced OCR technology</p>
+        
+
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">

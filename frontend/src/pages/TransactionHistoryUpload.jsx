@@ -164,7 +164,9 @@ const TransactionHistoryUpload = () => {
         <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
           Import Transaction History
         </h1>
-        <p className="text-gray-600 text-lg">Upload PDF bank statements or transaction history to import multiple transactions</p>
+        <p className="text-gray-600 text-lg mb-4">Upload PDF bank statements or transaction history powered by advanced OCR technology</p>
+        
+
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">

@@ -87,7 +87,6 @@ function Layout({ children }) {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-gray-900">{user?.name}</span>
-                  <span className="text-xs text-gray-500">Premium</span>
                 </div>
               </div>
 
@@ -142,7 +141,6 @@ function Layout({ children }) {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold text-gray-900">{user?.name}</span>
-                    <span className="text-xs text-gray-500">Premium Account</span>
                   </div>
                 </div>
                 <button
@@ -178,7 +176,7 @@ function Layout({ children }) {
             </div>
             <p className="text-sm text-gray-600 font-medium flex items-center gap-2">
               <Sparkles size={16} className="text-blue-500" />
-              © 2025 Personal Finance Assistant. All rights reserved.
+              Smart Money Management
             </p>
           </div>
         </div>

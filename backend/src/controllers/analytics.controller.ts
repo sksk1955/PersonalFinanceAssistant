@@ -157,16 +157,25 @@ export const getTransactionsByDate = async (req: AuthRequest, res: Response): Pr
 
 export const getMonthlyTrends = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { year = new Date().getFullYear() } = req.query;
+    const { year, startDate, endDate } = req.query;
 
-    const startOfYear = new Date(`${year}-01-01`);
-    const endOfYear = new Date(`${year}-12-31`);
+    let startOfPeriod: Date;
+    let endOfPeriod: Date;
+
+    if (startDate && endDate) {
+      startOfPeriod = new Date(startDate as string);
+      endOfPeriod = new Date(endDate as string);
+    } else {
+      const targetYear = year || new Date().getFullYear();
+      startOfPeriod = new Date(`${targetYear}-01-01`);
+      endOfPeriod = new Date(`${targetYear}-12-31`);
+    }
 
     const monthlyTrends = await Transaction.aggregate([
       {
         $match: {
           userId: new mongoose.Types.ObjectId(req.userId),
-          date: { $gte: startOfYear, $lte: endOfYear }
+          date: { $gte: startOfPeriod, $lte: endOfPeriod }
         }
       },
       {
@@ -196,7 +205,60 @@ export const getMonthlyTrends = async (req: AuthRequest, res: Response): Promise
       { $sort: { _id: 1 } }
     ]);
 
-    // Fill in missing months with 0 values
+    // If filtering by specific date range, return daily data instead of monthly for short periods
+    if (startDate && endDate) {
+      const startDateObj = new Date(startDate as string);
+      const endDateObj = new Date(endDate as string);
+      const daysDiff = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 3600 * 24));
+      
+      if (daysDiff <= 31) {
+        // For periods <= 31 days, return daily data
+        const dailyData = await Transaction.aggregate([
+          {
+            $match: {
+              userId: new mongoose.Types.ObjectId(req.userId),
+              date: { $gte: startOfPeriod, $lte: endOfPeriod }
+            }
+          },
+          {
+            $group: {
+              _id: {
+                date: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+                type: '$type'
+              },
+              amount: { $sum: '$amount' }
+            }
+          },
+          {
+            $group: {
+              _id: '$_id.date',
+              income: {
+                $sum: {
+                  $cond: [{ $eq: ['$_id.type', TransactionType.INCOME] }, '$amount', 0]
+                }
+              },
+              expenses: {
+                $sum: {
+                  $cond: [{ $eq: ['$_id.type', TransactionType.EXPENSE] }, '$amount', 0]
+                }
+              }
+            }
+          },
+          { $sort: { _id: 1 } }
+        ]);
+
+        const result = dailyData.map(item => ({
+          month: new Date(item._id).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          income: item.income || 0,
+          expenses: item.expenses || 0
+        }));
+
+        res.json(result);
+        return;
+      }
+    }
+
+    // For longer periods, show monthly data
     const monthNames = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'

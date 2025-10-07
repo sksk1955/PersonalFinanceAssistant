@@ -31,8 +31,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running', database: 'MongoDB' });
+app.get('/api/health', async (req, res) => {
+  try {
+    const { checkOcrServiceHealth } = await import('./services/tesseract-ocr.service');
+    const ocrStatus = await checkOcrServiceHealth();
+    
+    res.json({ 
+      status: 'OK', 
+      message: 'Server is running', 
+      database: 'MongoDB',
+      ocrService: ocrStatus ? 'Connected' : 'Disconnected'
+    });
+  } catch (error) {
+    res.json({ 
+      status: 'OK', 
+      message: 'Server is running', 
+      database: 'MongoDB',
+      ocrService: 'Error checking status'
+    });
+  }
 });
 
 // Routes

@@ -21,15 +21,63 @@ const ReceiptTransactionModal = ({
 
   useEffect(() => {
     if (extractedData && isOpen) {
-      setFormData({
-        amount: extractedData.amount || '',
-        description: extractedData.merchant || extractedData.description || '',
-        categoryId: extractedData.category || '',
+      console.log('Raw extracted data received:', extractedData);
+      console.log('Available categories:', categories);
+      
+      // Handle both direct data and nested data structures
+      const data = extractedData.data || extractedData;
+      console.log('Processed data:', data);
+      
+      // Find matching category by name
+      let matchingCategoryId = '';
+      if (data.category && categories && categories.length > 0) {
+        console.log('Looking for category match for:', data.category);
+        
+        // First try exact match
+        let matchingCategory = categories.find(cat => 
+          cat.name?.toLowerCase() === data.category?.toLowerCase()
+        );
+        
+        // If no exact match found, try partial matching
+        if (!matchingCategory) {
+          matchingCategory = categories.find(cat => 
+            cat.name?.toLowerCase().includes(data.category?.toLowerCase()) ||
+            data.category?.toLowerCase().includes(cat.name?.toLowerCase())
+          );
+        }
+        
+        // If still no match and we have "Other Expenses" category, use it as fallback
+        if (!matchingCategory) {
+          matchingCategory = categories.find(cat => 
+            cat.name?.toLowerCase() === 'other expenses'
+          );
+        }
+        
+        matchingCategoryId = matchingCategory?.id || matchingCategory?._id || '';
+        console.log('Found matching category:', matchingCategory, 'for extracted category:', data.category);
+      }
+
+      // Parse amount to ensure it's a valid number
+      let parsedAmount = '';
+      if (data.amount !== undefined && data.amount !== null) {
+        const amountNum = parseFloat(data.amount);
+        if (!isNaN(amountNum) && amountNum > 0) {
+          parsedAmount = amountNum.toString();
+        }
+      }
+
+      const newFormData = {
+        amount: parsedAmount,
+        description: data.merchant || data.description || '',
+        categoryId: matchingCategoryId,
         type: 'EXPENSE',
-        date: extractedData.date || new Date().toISOString().split('T')[0]
-      });
+        date: data.date || new Date().toISOString().split('T')[0]
+      };
+      
+      console.log('Final form data being set:', newFormData);
+      setFormData(newFormData);
     }
-  }, [extractedData, isOpen]);
+  }, [extractedData, isOpen, categories]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -99,7 +147,7 @@ const ReceiptTransactionModal = ({
             <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-100">
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles size={16} className="text-blue-600" />
-                <h3 className="text-sm font-semibold text-blue-900">AI Extracted Data</h3>
+                <h3 className="text-sm font-semibold text-blue-900">Extracted Data</h3>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {extractedData.merchant && (
@@ -186,10 +234,19 @@ const ReceiptTransactionModal = ({
                   step="0.01"
                   value={formData.amount}
                   onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-lg font-semibold"
+                  className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-lg font-semibold ${
+                    extractedData?.amount ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}
                   placeholder="0.00"
                   required
                 />
+                {extractedData?.amount && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                      Auto-filled
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -208,10 +265,19 @@ const ReceiptTransactionModal = ({
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+                    extractedData?.merchant ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}
                   placeholder="Transaction description"
                   required
                 />
+                {extractedData?.merchant && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                      Auto-filled
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
