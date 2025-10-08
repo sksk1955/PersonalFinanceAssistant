@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes';
 import transactionRoutes from './routes/transaction.routes';
 import categoryRoutes from './routes/category.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import userRoutes from './routes/user.routes';
 
 // Import middleware
 import { errorHandler } from './middlewares/error.middleware';
@@ -31,8 +32,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running', database: 'MongoDB' });
+app.get('/api/health', async (req, res) => {
+  try {
+    const { checkOcrServiceHealth } = await import('./services/tesseract-ocr.service');
+    const ocrStatus = await checkOcrServiceHealth();
+    
+    res.json({ 
+      status: 'OK', 
+      message: 'Server is running', 
+      database: 'MongoDB',
+      ocrService: ocrStatus ? 'Connected' : 'Disconnected'
+    });
+  } catch (error) {
+    res.json({ 
+      status: 'OK', 
+      message: 'Server is running', 
+      database: 'MongoDB',
+      ocrService: 'Error checking status'
+    });
+  }
 });
 
 // Routes
@@ -40,6 +58,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/users', userRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

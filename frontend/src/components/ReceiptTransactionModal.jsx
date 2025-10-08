@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { X, DollarSign, FileText, Tag, Calendar, TrendingDown, TrendingUp, Sparkles } from 'lucide-react';
 import api from '../config/api';
 
 const ReceiptTransactionModal = ({ 
@@ -11,25 +12,72 @@ const ReceiptTransactionModal = ({
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
-    category: '',
-    type: 'expense',
+    categoryId: '',
+    type: 'EXPENSE',
     date: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Populate form with extracted data when modal opens
   useEffect(() => {
     if (extractedData && isOpen) {
-      setFormData({
-        amount: extractedData.amount || '',
-        description: extractedData.merchant || extractedData.description || '',
-        category: extractedData.category || '',
-        type: 'expense',
-        date: extractedData.date || new Date().toISOString().split('T')[0]
-      });
+      console.log('Raw extracted data received:', extractedData);
+      console.log('Available categories:', categories);
+      
+      // Handle both direct data and nested data structures
+      const data = extractedData.data || extractedData;
+      console.log('Processed data:', data);
+      
+      // Find matching category by name
+      let matchingCategoryId = '';
+      if (data.category && categories && categories.length > 0) {
+        console.log('Looking for category match for:', data.category);
+        
+        // First try exact match
+        let matchingCategory = categories.find(cat => 
+          cat.name?.toLowerCase() === data.category?.toLowerCase()
+        );
+        
+        // If no exact match found, try partial matching
+        if (!matchingCategory) {
+          matchingCategory = categories.find(cat => 
+            cat.name?.toLowerCase().includes(data.category?.toLowerCase()) ||
+            data.category?.toLowerCase().includes(cat.name?.toLowerCase())
+          );
+        }
+        
+        // If still no match and we have "Other Expenses" category, use it as fallback
+        if (!matchingCategory) {
+          matchingCategory = categories.find(cat => 
+            cat.name?.toLowerCase() === 'other expenses'
+          );
+        }
+        
+        matchingCategoryId = matchingCategory?.id || matchingCategory?._id || '';
+        console.log('Found matching category:', matchingCategory, 'for extracted category:', data.category);
+      }
+
+      // Parse amount to ensure it's a valid number
+      let parsedAmount = '';
+      if (data.amount !== undefined && data.amount !== null) {
+        const amountNum = parseFloat(data.amount);
+        if (!isNaN(amountNum) && amountNum > 0) {
+          parsedAmount = amountNum.toString();
+        }
+      }
+
+      const newFormData = {
+        amount: parsedAmount,
+        description: data.merchant || data.description || '',
+        categoryId: matchingCategoryId,
+        type: 'EXPENSE',
+        date: data.date || new Date().toISOString().split('T')[0]
+      };
+      
+      console.log('Final form data being set:', newFormData);
+      setFormData(newFormData);
     }
-  }, [extractedData, isOpen]);
+  }, [extractedData, isOpen, categories]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -45,8 +93,7 @@ const ReceiptTransactionModal = ({
     setError('');
 
     try {
-      // Validate required fields
-      if (!formData.amount || !formData.description || !formData.category) {
+      if (!formData.amount || !formData.description || !formData.categoryId) {
         throw new Error('Please fill in all required fields');
       }
 
@@ -59,12 +106,11 @@ const ReceiptTransactionModal = ({
       onTransactionCreated();
       onClose();
       
-      // Reset form
       setFormData({
         amount: '',
         description: '',
-        category: '',
-        type: 'expense',
+        categoryId: '',
+        type: 'EXPENSE',
         date: ''
       });
     } catch (err) {
@@ -77,139 +123,217 @@ const ReceiptTransactionModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Create Transaction from Receipt
-            </h2>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto transform transition-all animate-slideUp">
+        <div className="p-8">
+          {/* Header */}
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-1">
+                Create Transaction
+              </h2>
+              <p className="text-sm text-gray-500">From receipt data</p>
+            </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+              className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-lg"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X size={24} />
             </button>
           </div>
 
+          {/* Extracted Info Banner */}
           {extractedData && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Extracted Information:</h3>
-              <div className="text-sm text-gray-600 space-y-1">
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles size={16} className="text-blue-600" />
+                <h3 className="text-sm font-semibold text-blue-900">Extracted Data</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 {extractedData.merchant && (
-                  <p><span className="font-medium">Merchant:</span> {extractedData.merchant}</p>
+                  <div>
+                    <span className="text-gray-600 block">Merchant</span>
+                    <span className="text-gray-900 font-semibold">{extractedData.merchant}</span>
+                  </div>
                 )}
                 {extractedData.amount && (
-                  <p><span className="font-medium">Amount:</span> ${extractedData.amount}</p>
+                  <div>
+                    <span className="text-gray-600 block">Amount</span>
+                    <span className="text-gray-900 font-semibold">${extractedData.amount}</span>
+                  </div>
                 )}
                 {extractedData.date && (
-                  <p><span className="font-medium">Date:</span> {extractedData.date}</p>
+                  <div>
+                    <span className="text-gray-600 block">Date</span>
+                    <span className="text-gray-900 font-semibold">{extractedData.date}</span>
+                  </div>
                 )}
                 {extractedData.confidence && (
-                  <p><span className="font-medium">Confidence:</span> {Math.round(extractedData.confidence)}%</p>
+                  <div>
+                    <span className="text-gray-600 block">Confidence</span>
+                    <span className="text-gray-900 font-semibold">{Math.round(extractedData.confidence)}%</span>
+                  </div>
                 )}
               </div>
             </div>
           )}
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm">{error}</p>
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+              <p className="text-red-700 text-sm font-medium">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Type Selection */}
             <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Transaction Type
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleInputChange({ target: { name: 'type', value: 'EXPENSE' } })}
+                  className={`py-3 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                    formData.type === 'EXPENSE'
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 transform scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-transparent hover:border-red-200'
+                  }`}
+                >
+                  <TrendingDown size={18} />
+                  Expense
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInputChange({ target: { name: 'type', value: 'INCOME' } })}
+                  className={`py-3 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                    formData.type === 'INCOME'
+                      ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30 transform scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-transparent hover:border-green-200'
+                  }`}
+                >
+                  <TrendingUp size={18} />
+                  Income
+                </button>
+              </div>
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 mb-2">
                 Amount *
               </label>
-              <input
-                type="number"
-                id="amount"
-                name="amount"
-                step="0.01"
-                value={formData.amount}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                placeholder="0.00"
-                required
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <DollarSign size={20} className="text-gray-400" />
+                </div>
+                <input
+                  type="number"
+                  id="amount"
+                  name="amount"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={handleInputChange}
+                  className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-lg font-semibold ${
+                    extractedData?.amount ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}
+                  placeholder="0.00"
+                  required
+                />
+                {extractedData?.amount && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                      Auto-filled
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Description */}
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
                 Description *
               </label>
-              <input
-                type="text"
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                placeholder="Transaction description"
-                required
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <FileText size={20} className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+                    extractedData?.merchant ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}
+                  placeholder="Transaction description"
+                  required
+                />
+                {extractedData?.merchant && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                      Auto-filled
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Category */}
             <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="categoryId" className="block text-sm font-semibold text-gray-700 mb-2">
                 Category *
               </label>
-              <select
-                id="category"
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                required
-              >
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                  <option key={category._id} value={category._id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Tag size={20} className="text-gray-400" />
+                </div>
+                <select
+                  id="categoryId"
+                  name="categoryId"
+                  value={formData.categoryId}
+                  onChange={handleInputChange}
+                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white"
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((category) => (
+                    <option key={category._id} value={category._id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
+            {/* Date */}
             <div>
-              <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
-                Type
-              </label>
-              <select
-                id="type"
-                name="type"
-                value={formData.type}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="date" className="block text-sm font-semibold text-gray-700 mb-2">
                 Date
               </label>
-              <input
-                type="date"
-                id="date"
-                name="date"
-                value={formData.date}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Calendar size={20} className="text-gray-400" />
+                </div>
+                <input
+                  type="date"
+                  id="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleInputChange}
+                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+              </div>
             </div>
 
+            {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium"
+                className="flex-1 px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-medium"
                 disabled={loading}
               >
                 Cancel
@@ -217,14 +341,44 @@ const ReceiptTransactionModal = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none"
               >
-                {loading ? 'Creating...' : 'Create Transaction'}
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Creating...
+                  </span>
+                ) : (
+                  'Create Transaction'
+                )}
               </button>
             </div>
           </form>
         </div>
       </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { 
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

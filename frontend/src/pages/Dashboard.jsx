@@ -23,10 +23,17 @@ import {
 } from 'recharts';
 import api from '../config/api';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { useCurrency } from '../contexts/CurrencyContext';
+import WeeklyTrendsChart from '../components/WeeklyTrendsChart';
+import DailyPatternsChart from '../components/DailyPatternsChart';
+import SpendingHeatmapChart from '../components/SpendingHeatmapChart';
+import TransactionVolumeChart from '../components/TransactionVolumeChart';
+import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
 function Dashboard() {
+  const { formatCurrency, userCurrency } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ income: 0, expense: 0, balance: 0, transactionCount: 0 });
   const [expensesByCategory, setExpensesByCategory] = useState([]);
@@ -35,6 +42,22 @@ function Dashboard() {
     startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
     endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd')
   });
+
+  // New chart data states
+  const [weeklyTrends, setWeeklyTrends] = useState([]);
+  const [dailyPatterns, setDailyPatterns] = useState([]);
+  const [spendingHeatmap, setSpendingHeatmap] = useState([]);
+  const [transactionVolume, setTransactionVolume] = useState([]);
+
+  // Filter and chart toggle states
+  const [filters, setFilters] = useState({
+    dateRange: {},
+    amountRange: {},
+    weeklyPeriod: '12',
+    dailyPeriod: '30',
+    volumePeriod: 'week'
+  });
+  const [activeCharts, setActiveCharts] = useState(['weekly', 'daily']);
 
   useEffect(() => {
     fetchAnalytics();
@@ -58,6 +81,7 @@ function Dashboard() {
       });
       
       setExpensesByCategory(expensesRes.data || []);
+      console.log('Monthly trends data received:', trendsRes.data);
       setMonthlyTrends(trendsRes.data || []);
     } catch (error) {
       // Set default values on error
@@ -66,6 +90,51 @@ function Dashboard() {
       setMonthlyTrends([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAdvancedAnalytics = async () => {
+    try {
+      const promises = [];
+      
+      if (activeCharts.includes('weekly')) {
+        promises.push(
+          api.get('/analytics/weekly-trends', {
+            params: { weeks: filters.weeklyPeriod }
+          }).then(res => setWeeklyTrends(res.data))
+        );
+      }
+      
+      if (activeCharts.includes('daily')) {
+        promises.push(
+          api.get('/analytics/daily-patterns', {
+            params: { days: filters.dailyPeriod }
+          }).then(res => setDailyPatterns(res.data))
+        );
+      }
+      
+      if (activeCharts.includes('heatmap')) {
+        promises.push(
+          api.get('/analytics/spending-heatmap', {
+            params: { months: 6 }
+          }).then(res => setSpendingHeatmap(res.data))
+        );
+      }
+      
+      if (activeCharts.includes('volume')) {
+        promises.push(
+          api.get('/analytics/transaction-volume', {
+            params: { 
+              period: filters.volumePeriod,
+              periods: 12 
+            }
+          }).then(res => setTransactionVolume(res.data))
+        );
+      }
+      
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Error fetching advanced analytics:', error);
     }
   };
 
@@ -78,10 +147,24 @@ function Dashboard() {
     });
   };
 
-  // Safe number formatting helper
-  const formatCurrency = (value) => {
-    return (value || 0).toFixed(2);
+  const handleToggleChart = (chartId) => {
+    setActiveCharts(prev => 
+      prev.includes(chartId) 
+        ? prev.filter(id => id !== chartId)
+        : [...prev, chartId]
+    );
   };
+
+  const handleFiltersChange = (newFilters) => {
+    setFilters(newFilters);
+  };
+
+  // Fetch advanced analytics when filters or active charts change
+  useEffect(() => {
+    if (activeCharts.length > 0) {
+      fetchAdvancedAnalytics();
+    }
+  }, [filters, activeCharts]);
 
   if (loading) {
     return (
@@ -95,7 +178,7 @@ function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
       <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">Financial Dashboard</h1>
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">Your Dashboard</h1>
         <p className="text-gray-600 text-lg">📊 Overview of your financial activities</p>
       </div>
 
@@ -125,6 +208,18 @@ function Dashboard() {
         >
           🗓️ This Month
         </button>
+        <button
+          onClick={() => handleQuickFilter(90)}
+          className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+        >
+          📈 Last 3 Months
+        </button>
+        <button
+          onClick={() => handleQuickFilter(365)}
+          className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+        >
+          🎯 Last Year
+        </button>
         <div className="flex gap-3 ml-auto">
           <input
             type="date"
@@ -150,7 +245,7 @@ function Dashboard() {
             </div>
           </div>
           <p className="text-sm text-gray-500 mb-2 font-medium">💰 Total Income</p>
-          <p className="text-3xl font-bold text-gray-900">${formatCurrency(summary.income)}</p>
+          <p className="text-3xl font-bold text-gray-900">{formatCurrency(summary.income)}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
@@ -160,7 +255,7 @@ function Dashboard() {
             </div>
           </div>
           <p className="text-sm text-gray-500 mb-2 font-medium">💸 Total Expenses</p>
-          <p className="text-3xl font-bold text-gray-900">${formatCurrency(summary.expense)}</p>
+          <p className="text-3xl font-bold text-gray-900">{formatCurrency(summary.expense)}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
@@ -171,7 +266,7 @@ function Dashboard() {
           </div>
           <p className="text-sm text-gray-500 mb-2 font-medium">🏦 Balance</p>
           <p className={`text-3xl font-bold ${summary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            ${formatCurrency(summary.balance)}
+            {formatCurrency(summary.balance)}
           </p>
         </div>
 
@@ -201,13 +296,13 @@ function Dashboard() {
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
-                  label={(entry) => `${entry.categoryName}: $${(entry.amount || 0).toFixed(0)}`}
+                  label={(entry) => `${entry.categoryName}: ${formatCurrency(entry.amount || 0)}`}
                 >
                   {expensesByCategory.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => `$${(value || 0).toFixed(2)}`} />
+                <Tooltip formatter={(value) => formatCurrency(value || 0)} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -226,7 +321,7 @@ function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="categoryName" angle={-45} textAnchor="end" height={100} />
                 <YAxis />
-                <Tooltip formatter={(value) => `$${(value || 0).toFixed(2)}`} />
+                <Tooltip formatter={(value) => formatCurrency(value || 0)} />
                 <Bar dataKey="amount" fill="#3B82F6" />
               </BarChart>
             </ResponsiveContainer>
@@ -243,25 +338,46 @@ function Dashboard() {
         <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center">📈 Monthly Trends</h2>
         {monthlyTrends.length > 0 ? (
           <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={monthlyTrends}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip formatter={(value) => `$${(value || 0).toFixed(2)}`} />
+            <LineChart data={monthlyTrends} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis 
+                dataKey="month" 
+                tick={{ fill: '#6B7280', fontSize: 12 }}
+                axisLine={{ stroke: '#E5E7EB' }}
+              />
+              <YAxis 
+                tick={{ fill: '#6B7280', fontSize: 12 }}
+                axisLine={{ stroke: '#E5E7EB' }}
+                tickFormatter={(value) => formatCurrency(value)}
+              />
+              <Tooltip 
+                formatter={(value, name) => [formatCurrency(value || 0), name]}
+                labelStyle={{ color: '#374151' }}
+                contentStyle={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
               <Legend />
               <Line 
                 type="monotone" 
                 dataKey="income" 
                 stroke="#10B981" 
-                strokeWidth={2}
+                strokeWidth={3}
                 name="Income"
+                dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, fill: '#10B981' }}
               />
               <Line 
                 type="monotone" 
-                dataKey="expense" 
+                dataKey="expenses" 
                 stroke="#EF4444" 
-                strokeWidth={2}
-                name="Expense"
+                strokeWidth={3}
+                name="Expenses"
+                dot={{ fill: '#EF4444', strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6, fill: '#EF4444' }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -269,6 +385,33 @@ function Dashboard() {
           <div className="h-80 flex items-center justify-center text-gray-500">
             No monthly data available
           </div>
+        )}
+      </div>
+
+      {/* Advanced Filters and Chart Controls */}
+      <AdvancedFilterPanel
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        onToggleChart={handleToggleChart}
+        activeCharts={activeCharts}
+      />
+
+      {/* Advanced Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {activeCharts.includes('weekly') && (
+          <WeeklyTrendsChart data={weeklyTrends} height={350} />
+        )}
+        
+        {activeCharts.includes('daily') && (
+          <DailyPatternsChart data={dailyPatterns} height={350} />
+        )}
+        
+        {activeCharts.includes('heatmap') && (
+          <SpendingHeatmapChart data={spendingHeatmap} height={350} />
+        )}
+        
+        {activeCharts.includes('volume') && (
+          <TransactionVolumeChart data={transactionVolume} height={350} />
         )}
       </div>
 
@@ -288,7 +431,7 @@ function Dashboard() {
                       {category.categoryName || 'Unknown'}
                     </span>
                     <span className="text-sm text-gray-600">
-                      ${categoryAmount.toFixed(2)} ({percentage.toFixed(1)}%)
+                      {formatCurrency(categoryAmount)} ({percentage.toFixed(1)}%)
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">

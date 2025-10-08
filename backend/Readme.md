@@ -340,10 +340,7 @@ npm start
 - Backend: Heroku, Railway, Render, Vercel
 - Database: MongoDB Atlas (free tier available)
 
-## 📄 License
-
-ISC
-
+---
 
 A robust REST API for managing personal finances with OCR receipt processing.
 

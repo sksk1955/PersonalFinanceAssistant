@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Transaction } from '../models/Transaction';
 import { Category, TransactionType } from '../models/Category';
-import { extractReceiptData } from '../services/ocr.service';
+import { extractReceiptData, extractTransactionHistory } from '../services/tesseract-ocr.service';
 
 interface AuthRequest extends Request {
   userId?: string;
@@ -332,4 +332,111 @@ const buildDescription = (extractedData: any): string => {
   }
   
   return parts.length > 0 ? parts.join(' - ') : 'Receipt transaction';
+};
+
+export const uploadTransactionHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    const filePath = req.file.path;
+    const mimeType = req.file.mimetype;
+
+    // Extract transaction history using Tesseract OCR
+    const extractedHistory = await extractTransactionHistory(filePath, mimeType);
+
+    res.json({
+      message: 'Transaction history processed successfully',
+      data: extractedHistory
+    });
+  } catch (error) {
+    console.error('Upload transaction history error:', error);
+    res.status(500).json({ error: 'Failed to process transaction history' });
+  }
+};
+
+export const createTransactionsFromHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { transactions, categoryMappings } = req.body;
+
+    if (!transactions || !Array.isArray(transactions)) {
+      res.status(400).json({ error: 'Invalid transaction data' });
+      return;
+    }
+
+    const createdTransactions: any[] = [];
+    const errors: string[] = [];
+
+    console.log('Creating transactions from history:', {
+      transactionCount: transactions.length,
+      categoryMappings,
+      userId: req.userId
+    });
+
+    for (let i = 0; i < transactions.length; i++) {
+      const txn = transactions[i];
+      let categoryId: mongoose.Types.ObjectId | null = null;
+      
+      try {
+        // Apply category mapping if provided
+        if (categoryMappings && categoryMappings[i]) {
+          categoryId = new mongoose.Types.ObjectId(categoryMappings[i]);
+        } else {
+          // Try to find a default category for the transaction type
+          const defaultCategory = await Category.findOne({ 
+            type: txn.type.toUpperCase() as TransactionType
+          });
+          if (defaultCategory) {
+            categoryId = defaultCategory._id;
+          }
+        }
+
+        if (!categoryId) {
+          errors.push(`Transaction ${i + 1}: No category specified`);
+          continue;
+        }
+
+        const transaction = await Transaction.create({
+          amount: parseFloat(txn.amount),
+          type: txn.type.toUpperCase() as TransactionType,
+          categoryId,
+          userId: req.userId,
+          date: new Date(txn.date),
+          description: txn.description
+        });
+
+        // Populate category for response
+        await transaction.populate('categoryId', 'name type');
+        createdTransactions.push(transaction);
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`Error creating transaction ${i + 1}:`, {
+          transaction: txn,
+          error: errorMessage,
+          categoryId
+        });
+        errors.push(`Transaction ${i + 1}: ${errorMessage}`);
+      }
+    }
+
+    res.json({
+      message: `Successfully created ${createdTransactions.length} transactions`,
+      data: {
+        created: createdTransactions,
+        errors: errors,
+        summary: {
+          total: transactions.length,
+          created: createdTransactions.length,
+          failed: errors.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Create transactions from history error:', error);
+    res.status(500).json({ error: 'Failed to create transactions' });
+  }
 };

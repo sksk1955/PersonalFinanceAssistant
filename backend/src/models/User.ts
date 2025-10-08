@@ -5,6 +5,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   name: string;
+  currency: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +27,12 @@ const userSchema = new Schema<IUser>({
     type: String,
     required: true,
     trim: true
+  },
+  currency: {
+    type: String,
+    required: true,
+    default: 'USD',
+    enum: ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'SEK', 'NZD', 'MXN', 'SGD', 'HKD', 'NOK', 'TRY', 'RUB', 'ZAR', 'BRL', 'KRW']
   }
 }, {
   timestamps: true

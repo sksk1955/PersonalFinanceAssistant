@@ -1,10 +1,14 @@
 "# Personal Finance Assistant
 
+## 🎥 Demo Video
+[![Watch Demo Video](https://img.shields.io/badge/🎥-Watch%20Demo%20Video-red?style=for-the-badge)](https://drive.google.com/file/d/1ZC64yuAd6iJC_ttg9bLEiIR_lmCF5MvO/view?usp=sharing)
+
 A full-stack web application designed to help users track, manage, and understand their financial activities. Users can log income and expenses, categorize transactions, view analytics with interactive charts, and extract transaction data from receipts using OCR technology.
 
 ![License](https://img.shields.io/badge/license-ISC-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![React](https://img.shields.io/badge/react-19.1.1-blue.svg)
+
 
 ## 🌟 Features
 
@@ -445,15 +449,7 @@ This project follows best practices for code quality:
 - [ ] Implement dark mode
 - [ ] Mobile app (React Native)
 
-## 📄 License
-
-ISC License
-
-## 👥 Authors
-
-- Your Name - Initial work
-
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Tesseract.js for OCR functionality
 - Recharts for beautiful charts
