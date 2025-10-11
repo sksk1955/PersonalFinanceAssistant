@@ -5,7 +5,6 @@
 
 A full-stack web application designed to help users track, manage, and understand their financial activities. Users can log income and expenses, categorize transactions, view analytics with interactive charts, and extract transaction data from receipts using OCR technology.
 
-![License](https://img.shields.io/badge/license-ISC-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 ![React](https://img.shields.io/badge/react-19.1.1-blue.svg)
 
@@ -437,7 +436,7 @@ This project follows best practices for code quality:
 5. **Documentation**: Inline comments for complex logic
 6. **Consistent Formatting**: Using ESLint and Prettier
 
-## 🐛 Known Issues & Future Enhancements
+##  Known Issues & Future Enhancements
 
 ### To Do:
 - [ ] Add unit and integration tests
@@ -454,7 +453,3 @@ This project follows best practices for code quality:
 - Tesseract.js for OCR functionality
 - Recharts for beautiful charts
 - Mongoose for excellent MongoDB integration
-- The open-source community
-"
-- The open-source community
-"  
